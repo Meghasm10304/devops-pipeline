@@ -9,7 +9,8 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git 'https://github.com/Meghasm10304/devops-pipeline.git'
+		git branch: 'main',
+                url: 'https://github.com/Meghasm10304/devops-pipeline.git'
             }
         }
 
