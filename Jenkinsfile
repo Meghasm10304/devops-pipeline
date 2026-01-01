@@ -2,45 +2,72 @@ pipeline {
     agent any
 
     environment {
-        DOCKERHUB_CREDENTIALS = 'dockerhub-credentials' // Jenkins credential ID
-        IMAGE_NAME = 'meghasm10304/hello-devops'
+        IMAGE_NAME = "hello-devops"
+        CONTAINER_NAME = "hello-devops-container"
     }
 
     stages {
-        stage('Checkout') {
+
+        stage('Checkout Code') {
             steps {
-		git branch: 'main',
-                url: 'https://github.com/Meghasm10304/devops-pipeline.git'
+                checkout scm
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                script {
-                    dockerImage = docker.build("${IMAGE_NAME}:${env.BUILD_NUMBER}")
-                }
+                sh '''
+                echo "Building Docker image..."
+                docker --version
+                docker build -t $IMAGE_NAME .
+                '''
             }
         }
+
+        stage('Run Docker Container') {
+            steps {
+                sh '''
+                echo "Running Docker container..."
+
+                # Stop and remove existing container if present
+                docker rm -f $CONTAINER_NAME || true
+
+                # Run new container
+                docker run -d \
+                  -p 8082:80 \
+                  --name $CONTAINER_NAME \
+                  $IMAGE_NAME
+                '''
+            }
+        }
+
+        /*
+        OPTIONAL — ENABLE LATER (DockerHub push)
 
         stage('Push Docker Image') {
             steps {
-                script {
-                    docker.withRegistry('', "${DOCKERHUB_CREDENTIALS}") {
-                        dockerImage.push()
-                    }
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-credentials',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    sh '''
+                    echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                    docker tag $IMAGE_NAME $DOCKER_USER/$IMAGE_NAME:latest
+                    docker push $DOCKER_USER/$IMAGE_NAME:latest
+                    '''
                 }
             }
         }
+        */
+    }
 
-        stage('Run Container') {
-            steps {
-                script {
-                    // Stop old container if exists
-                    sh "docker rm -f hello-devops || true"
-                    // Run new container
-                    sh "docker run -d --name hello-devops -p 3000:3000 ${IMAGE_NAME}:${env.BUILD_NUMBER}"
-                }
-            }
+    post {
+        success {
+            echo "✅ Pipeline executed successfully"
+        }
+        failure {
+            echo "❌ Pipeline failed. Check logs."
         }
     }
 }
