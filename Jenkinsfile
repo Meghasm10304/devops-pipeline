@@ -2,8 +2,8 @@ pipeline {
     agent any
 
     environment {
-        IMAGE_NAME = "hello-devops"
-        CONTAINER_NAME = "hello-devops-container"
+        IMAGE_NAME = "meghasm10304/hello-devops"
+        CONTAINER_NAME = "hello-devops-app"
     }
 
     stages {
@@ -17,34 +17,12 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 sh '''
-                echo "Building Docker image..."
-                docker --version
                 docker build -t $IMAGE_NAME .
                 '''
             }
         }
 
-        stage('Run Docker Container') {
-            steps {
-                sh '''
-                echo "Running Docker container..."
-
-                # Stop and remove existing container if present
-                docker rm -f $CONTAINER_NAME || true
-
-                # Run new container
-                docker run -d \
-                  -p 8082:80 \
-                  --name $CONTAINER_NAME \
-                  $IMAGE_NAME
-                '''
-            }
-        }
-
-        /*
-        OPTIONAL — ENABLE LATER (DockerHub push)
-
-        stage('Push Docker Image') {
+        stage('Login to Docker Hub') {
             steps {
                 withCredentials([usernamePassword(
                     credentialsId: 'dockerhub-credentials',
@@ -53,22 +31,35 @@ pipeline {
                 )]) {
                     sh '''
                     echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                    docker tag $IMAGE_NAME $DOCKER_USER/$IMAGE_NAME:latest
-                    docker push $DOCKER_USER/$IMAGE_NAME:latest
                     '''
                 }
             }
         }
-        */
+
+        stage('Push Docker Image') {
+            steps {
+                sh '''
+                docker push $IMAGE_NAME
+                '''
+            }
+        }
+
+        stage('Run Container') {
+            steps {
+                sh '''
+                docker rm -f $CONTAINER_NAME || true
+                docker run -d -p 8082:8080 --name $CONTAINER_NAME $IMAGE_NAME
+                '''
+            }
+        }
     }
 
     post {
         success {
-            echo "✅ Pipeline executed successfully"
+            echo '✅ CI/CD pipeline completed successfully'
         }
         failure {
-            echo "❌ Pipeline failed. Check logs."
+            echo '❌ Pipeline failed'
         }
     }
 }
-
